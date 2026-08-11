@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lost Marble Run</title>
+    <style>
+        body { margin: 0; background-color: #030306; color: #fff; font-family: 'Courier New', Courier, monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+        #wrapper { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        canvas { background-color: #05050a; border: 3px solid #1a1a2e; box-shadow: 0px 0px 20px rgba(0,255,204,0.2); image-rendering: pixelated; }
+        .screen { display: flex; flex-direction: column; align-items: center; justify-content: center; background: #0b0b16; border: 3px solid #333; border-radius: 8px; width: 480px; height: 360px; box-shadow: 0px 0px 20px rgba(0,0,0,0.9); }
+        .menu-title { font-size: 18px; font-weight: bold; color: #00ffcc; margin-bottom: 12px; text-shadow: 0 0 10px #00ffcc; text-align: center; }
+        .menu-btn { background: #16162a; color: white; border: 2px solid #00ffcc; padding: 8px 16px; font-size: 11px; font-family: 'Courier New', monospace; font-weight: bold; margin: 4px; cursor: pointer; border-radius: 5px; width: 220px; box-shadow: 0 3px #005544; }
+        .menu-btn:active { box-shadow: 0 1px #005544; transform: translateY(2px); }
+        
+        #topBar { display: flex; gap: 6px; align-items: center; justify-content: space-between; width: 470px; }
+        #byteTracker { font-size: 9px; color: #00ffcc; font-weight: bold; background: #111; padding: 3px 6px; border-radius: 4px; border: 1px solid #00ffcc; }
+        #musicSelect { background: #111; color: #ff00ff; border: 1px solid #ff00ff; font-family: monospace; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 3px; cursor: pointer; }
+
+        #bottomPanel { display: flex; flex-direction: column; gap: 4px; align-items: center; background: #0f0f1a; padding: 4px; border-radius: 6px; border: 1px solid #222; width: 470px; }
+        #btnGrid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; width: 100%; }
+        .action-btn { color: white; border: none; padding: 2px; font-size: 6px; font-weight: bold; font-family: 'Courier New', monospace; cursor: pointer; border-radius: 3px; height: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-shadow: 0 0 2px #000; overflow: hidden; }
+        
+        #ballSelectModal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.88); flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
+        .select-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; width: 360px; }
+        .select-btn { background: #111; color: #fff; border: 2px solid #00ffcc; padding: 8px; font-weight: bold; cursor: pointer; border-radius: 6px; font-size: 10px; font-family: monospace; text-align: center; }
+        .select-btn:hover { background: #00ffcc; color: #000; }
+        .btn-infinite { border-color: #ff00ff !important; color: #ff00ff !important; text-shadow: 0 0 5px #ff00ff; }
+        
+        .color-selector { display: flex; gap: 6px; margin-bottom: 12px; justify-content: center; width: 320px; }
+        .color-opt { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 2px solid #fff; }
+        .color-opt.selected { border: 2px solid #00ffcc; transform: scale(1.25); box-shadow: 0 0 8px #00ffcc; }
+    </style>
+</head>
+<body>
+    <div id="wrapper">
+        <div id="mainMenu" class="screen">
+            <div class="menu-title">LOST MARBLE RUN v6.9<br><span style="font-size:11px; color:#ff00ff;">OFFICIAL PUBLISH BUILD</span></div>
+            <button class="menu-btn" onclick="startMode('single')">1 OYUNCU (SİM)</button>
+            <button class="menu-btn" style="border-color: #ff3333;" onclick="startMode('multi')">2 OYUNCU (VS MODU)</button>
+            <button class="menu-btn" style="border-color: #33ff33;" onclick="startMode('4player')">4 OYUNCU (KRAL SAVAŞI)</button>
+            <button class="menu-btn" style="border-color: #ff00ff;" onclick="startMode('16player')">🔥 16 KİŞİLİK DEV ARENA</button>
+        </div>
+
+        <div id="gameArea" style="display: none; flex-direction: column; align-items: center; gap: 4px; position: relative;">
+            <div id="topBar">
+                <div id="byteTracker">PIKSEL: 0 BYTE</div>
+                <div>
+                    🎵 <select id="musicSelect" onchange="changeMusic(this.value)">
+                        <option value="none">Sessiz</option>
+                        <option value="retro">Lost Marbles 8-Bit Retro</option>
+                        <option value="cyber">Cyber Arcade Chiptune</option>
+                        <option value="boss">Boss Battle Synth</option>
+                        <option value="chill">Lost Marbles Chill Beat</option>
+                    </select>
+                </div>
+            </div>
+            <canvas id="gameCanvas" width="480" height="320"></canvas>
+            <div id="bottomPanel"><div id="btnGrid"></div></div>
+
+            <div id="ballSelectModal">
+                <div style="font-size:11px; color:#00ffcc; font-weight:bold; margin-bottom:4px;">KULE RENGİNİ SEÇ:</div>
+                <div class="color-selector" id="modalColorPicker"></div>
+
+                <div style="font-size:11px; color:#00ffcc; font-weight:bold; margin-bottom:6px;">GÖNDERİLECEK TOPU SEÇ:</div>
+                <div class="select-grid">
+                    <button class="select-btn" onclick="confirmShoot(500000)">500K Top</button>
+                    <button class="select-btn" onclick="confirmShoot(1000000)">1M Top</button>
+                    <button class="select-btn" onclick="confirmShoot(2000000)">2M Top</button>
+                    <button class="select-btn" onclick="confirmShoot(25000000)">25M Top</button>
+                    <button class="select-btn" onclick="confirmShoot(50000000)">50M Top</button>
+                    <button class="select-btn" onclick="confirmShoot(100000000)">100M Top</button>
+                    <button class="select-btn" style="border-color:#ffcc00; color:#ffcc00;" onclick="confirmShoot(500000000)">🌀 500M Çekim</button>
+                    <button class="select-btn" style="border-color:#ff3333; color:#ff3333;" onclick="confirmShoot(1000000000)">💥 1B (1 Milyar)</button>
+                    <button class="select-btn btn-infinite" onclick="confirmShoot(999999999999)">✨ ∞ MUTLAK SONSUZ</button>
+                </div>
+                <button style="margin-top:12px; background:#333; color:#fff; border:none; padding:5px 14px; border-radius:4px; cursor:pointer;" onclick="closeModal()">KAPAT</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const bgCanvas = document.createElement("canvas");
+        bgCanvas.width = canvas.width; bgCanvas.height = canvas.height;
+        const bgCtx = bgCanvas.getContext("2d");
+
+        let hp = {}; let ammo = {}; let shieldHp = {};
+        const maxHp = 5000000; 
+
+        let projectiles = []; let particles = [];
+        let isGameRunning = false;
+        let gameMode = "16player";
+        let activeShooterType = null;
+        let totalBytesPainted = 0;
+        let gameOverTimer = null;
+
+        let audioCtx = null;
+        let musicInterval = null;
+
+        function changeMusic(type) {
+            if (musicInterval) clearInterval(musicInterval);
+            if (type === 'none') return;
+
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            let notes = [261.63, 329.63, 392.00, 523.25];
+            if (type === 'cyber') notes = [220, 293.66, 349.23, 440];
+            if (type === 'boss') notes = [110, 123.47, 130.81, 98];
+            if (type === 'chill') notes = [196, 246.94, 293.66, 392];
+
+            let step = 0;
+            musicInterval = setInterval(() => {
+                if (!isGameRunning) return;
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(notes[step % notes.length], audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.015, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.2);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.2);
+                step++;
+            }, 280);
+        }
+
+        const availableColorsList = ["#ff0000", "#0000ff", "#00ff00", "#ffff00", "#ff00ff", "#00ffff", "#ff7f00", "#ffffff"];
+
+        let gates = [
+            { x: 70,  y: 130, w: 35, h: 20, label: "x4", mult: 4, color: "#00ffaa", cooldown: 0 },
+            { x: 375, y: 130, w: 35, h: 20, label: "x8", mult: 8, color: "#3399ff", cooldown: 0 }
+        ];
+
+        let gate16x = { x: 220, y: 140, w: 40, h: 40, label: "x16", mult: 16, color: "#ff00ff", life: 10, active: true, respawnTimer: 0 };
+
+        let towerAngles = {};
+        let pools = {};
+        
+        const playerColors = {
+            p1: "#ff0000", p2: "#ff7f00", p3: "#ffff00", p4: "#7fff00",
+            p5: "#00ff00", p6: "#00ff7f", p7: "#00ffff", p8: "#007fff",
+            p9: "#0000ff", p10: "#7f00ff", p11: "#ff00ff", p12: "#ff007f",
+            p13: "#ffffff", p14: "#aa5500", p15: "#888888", p16: "#00aa88"
+        };
+
+        function setupPools(mode) {
+            pools = {}; hp = {}; ammo = {}; shieldHp = {}; towerAngles = {};
+            if (mode === 'single' || mode === 'multi' || mode === '4player') {
+                const fourPools = {
+                    p1: { x: 70,  y: 60,  r: 18, color: "#ff0000", name: "P1" }, 
+                    p2: { x: 410, y: 60,  r: 18, color: "#0000ff", name: "P2" }, 
+                    p3: { x: 70,  y: 260, r: 18, color: "#00ff00", name: "P3" }, 
+                    p4: { x: 410, y: 260, r: 18, color: "#ffff00", name: "P4" }  
+                };
+                if (mode === 'single') delete fourPools.p2, delete fourPools.p3, delete fourPools.p4;
+                if (mode === 'multi') delete fourPools.p3, delete fourPools.p4;
+                Object.assign(pools, fourPools);
+            } else {
+                let pIndex = 1;
+                for(let r=0; r<4; r++) {
+                    for(let c=0; c<4; c++) {
+                        let id = "p" + pIndex;
+                        pools[id] = { x: 60 + c * 120, y: 45 + r * 72, r: 10, color: playerColors[id], name: id.toUpperCase() };
+                        pIndex++;
+                    }
+                }
+            }
+            Object.keys(pools).forEach(id => { 
+                pools[id].active = true; 
+                hp[id] = maxHp; 
+                ammo[id] = 100; 
+                shieldHp[id] = 1000000; 
+                towerAngles[id] = Math.random() * Math.PI * 2; 
+            });
+        }
+
+        setInterval(() => {
+            if(!isGameRunning) return;
+            Object.keys(pools).forEach(id => {
+                if (pools[id].active && hp[id] > 0) {
+                    if (ammo[id] <= 0) {
+                        ammo[id] = 100;
+                    }
+                }
+            });
+        }, 10000);
+
+        function renderButtons() {
+            const grid = document.getElementById("btnGrid");
+            grid.innerHTML = "";
+            if (gameMode === 'single') grid.style.gridTemplateColumns = "1fr";
+            else if (gameMode === 'multi') grid.style.gridTemplateColumns = "1fr 1fr";
+            else if (gameMode === '4player') grid.style.gridTemplateColumns = "repeat(4, 1fr)";
+            else grid.style.gridTemplateColumns = "repeat(8, 1fr)";
+            Object.keys(pools).forEach(id => {
+                let darkText = (pools[id].color==='#ffff00'||pools[id].color==='#00ffff'||pools[id].color==='#ffffff');
+                grid.innerHTML += `<button id="btn-${id}" class="action-btn" style="background:${pools[id].color}; color:${darkText?'#000':'#fff'};" onclick="openSelectModal('${id}')"><div style="font-size:7px; font-weight:bold;">${pools[id].name}</div><div style="font-size:5px;" id="txt-${id}">C:${formatScore(hp[id])}|M:${ammo[id]}</div></button>`;
+            });
+        }
+
+        function openSelectModal(type) {
+            if (!pools[type] || hp[type] <= 0) return;
+            activeShooterType = type;
+
+            const picker = document.getElementById("modalColorPicker");
+            picker.innerHTML = "";
+            availableColorsList.forEach(hex => {
+                let opt = document.createElement("div");
+                opt.className = "color-opt" + (pools[type].color === hex ? " selected" : "");
+                opt.style.backgroundColor = hex;
+                opt.onclick = () => {
+                    pools[type].color = hex;
+                    renderButtons();
+                    openSelectModal(type);
+                };
+                picker.appendChild(opt);
+            });
+
+            document.getElementById("ballSelectModal").style.display = "flex";
+        }
+
+        function closeModal() {
+            document.getElementById("ballSelectModal").style.display = "none";
+        }
+
+        function getRadiusForPower(power) {
+            if (power >= 999999999999) return 14; 
+            if (power >= 1000000000) return 12;   
+            if (power >= 500000000) return 10;  
+            if (power >= 100000000) return 8.5;     
+            if (power >= 25000000) return 7.5;      
+            if (power >= 2000000) return 6.5;       
+            return 5.5; 
+        }
+
+        function confirmShoot(selectedPower) {
+            closeModal();
+            if (!activeShooterType) return;
+            
+            let t = pools[activeShooterType];
+            let angle = towerAngles[activeShooterType];
+            let radius = getRadiusForPower(selectedPower);
+            
+            let speed = calculateSpeed(selectedPower);
+            
+            let vx = Math.cos(angle) * speed;
+            let vy = Math.sin(angle) * speed;
+
+            projectiles.push({ 
+                x: t.x + Math.cos(angle) * (t.r + radius + 2), 
+                y: t.y + Math.sin(angle) * (t.r + radius + 2), 
+                vx: vx, vy: vy, 
+                radius: radius, 
+                maxPower: selectedPower, 
+                color: t.color, type: activeShooterType, 
+                power: selectedPower, 
+                isInfinite: selectedPower >= 999999999999,
+                hasShield: true, 
+                isBig: true, 
+                spawnProtect: 15 
+            });
+        }
+
+        function resetToMainMenu() {
+            isGameRunning = false;
+            projectiles = [];
+            particles = [];
+            totalBytesPainted = 0;
+            gameOverTimer = null;
+            document.getElementById("gameArea").style.display = "none";
+            document.getElementById("mainMenu").style.display = "flex";
+        }
+
+        function startMode(selectedMode) {
+            gameMode = selectedMode;
+            setupPools(gameMode);
+            renderButtons();
+            document.getElementById("mainMenu").style.display = "none";
+            document.getElementById("gameArea").style.display = "flex";
+            initGame();
+        }
+
+        function initGame() {
+            bgCtx.fillStyle = "#05050a";
+            bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+            isGameRunning = true;
+            update();
+        }
+
+        function calculateSpeed(power) {
+            if (power >= 500000000) return 0.6; 
+            if (power >= 100000000) return 0.8; 
+            if (power >= 10000000) return 1.4;  
+            return 2.5;                         
+        }
+
+        setInterval(() => {
+            if(!isGameRunning) return;
+            gates.forEach(g => { if (g.cooldown > 0) g.cooldown--; });
+
+            if (gate16x.active) {
+                gate16x.life--;
+                if (gate16x.life <= 0) {
+                    gate16x.active = false; 
+                    gate16x.respawnTimer = 6; 
+                }
+            } else {
+                gate16x.respawnTimer--;
+                if (gate16x.respawnTimer <= 0) {
+                    gate16x.active = true;
+                    gate16x.life = 10;
+                    gate16x.x = 100 + Math.random() * 280;
+                    gate16x.y = 80 + Math.random() * 160;
+                }
+            }
+        }, 1000);
+
+        setInterval(() => {
+            if(!isGameRunning) return;
+
+            let smallBullets = projectiles.filter(p => !p.isBig).length;
+            if (smallBullets >= 50) return;
+
+            Object.keys(pools).forEach(c => {
+                if (hp[c] <= 0 || !pools[c].active) return;
+                let pool = pools[c];
+
+                if (ammo[c] > 0) {
+                    let nearestEnemy = null;
+                    let minDist = 120;
+
+                    for (let p of projectiles) {
+                        if (p.type !== c && p.isBig) {
+                            let d = Math.hypot(p.x - pool.x, p.y - pool.y);
+                            if (d < minDist) {
+                                minDist = d;
+                                nearestEnemy = p;
+                            }
+                        }
+                    }
+
+                    if (nearestEnemy) {
+                        let aimAngle = Math.atan2(nearestEnemy.y - pool.y, nearestEnemy.x - pool.x);
+                        towerAngles[c] = aimAngle;
+
+                        projectiles.push({ x: pool.x, y: pool.y, vx: Math.cos(aimAngle) * 5.5, vy: Math.sin(aimAngle) * 5.5, radius: 2.0, color: pool.color, type: c, power: 30000, isBig: false, spawnProtect: 5 });
+                        ammo[c]--;
+                    } else {
+                        towerAngles[c] += 0.2;
+                        projectiles.push({ x: pool.x, y: pool.y, vx: Math.cos(towerAngles[c]) * 4.5, vy: Math.sin(towerAngles[c]) * 4.5, radius: 1.5, color: pool.color, type: c, power: 8000, isBig: false, spawnProtect: 8 });
+                        ammo[c] = Math.max(0, ammo[c] - 1); 
+                    }
+                }
+            });
+        }, 90);
+
+        function createExplosion(x, y, color) {
+            for(let i=0; i<8; i++) { 
+                particles.push({ 
+                    x: x, y: y, 
+                    vx: (Math.random() - 0.5) * 4, 
+                    vy: (Math.random() - 0.5) * 4, 
+                    size: Math.random() * 3 + 1, 
+                    life: 14, 
+                    color: color 
+                }); 
+            }
+        }
+
+        function triggerEliminationLoot(deadKey) {
+            let pool = pools[deadKey];
+            createExplosion(pool.x, pool.y, pool.color);
+
+            let leftoverAmmo = ammo[deadKey] || 100;
+            let lootPower = leftoverAmmo * 1000; 
+
+            let angle = Math.random() * Math.PI * 2;
+            let speed = calculateSpeed(lootPower);
+
+            projectiles.push({
+                x: pool.x, y: pool.y,
+                vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                radius: getRadiusForPower(lootPower), maxPower: lootPower,
+                color: pool.color, type: deadKey,
+                power: lootPower, hasShield: true, isBig: true, spawnProtect: 0 
+            });
+        }
+
+        function formatScore(num) {
+            if (num >= 999999999999) return "∞";
+            if (num >= 1000000000) return (num / 1000000000).toFixed(1) + "B";
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
+            if (num >= 1000) return Math.floor(num / 1000) + "K";
+            return Math.floor(num);
+        }
+
+        function drawShieldedMarble(ctx, x, y, r, color, power, hasShield, vx, vy, isInfinite) {
+            ctx.save();
+            ctx.translate(x, y);
+
+            if (isInfinite) {
+                ctx.shadowColor = "#ff00ff"; ctx.shadowBlur = 12;
+            }
+
+            if (!hasShield) {
+                ctx.strokeStyle = color; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(vx * 6, vy * 6); ctx.stroke();
+                ctx.fillStyle = color;
+                ctx.fillRect(-1, -1, 2.5, 2.5);
+                ctx.restore();
+                return;
+            }
+
+            ctx.beginPath(); ctx.arc(0, 0, r + 2.5, 0, Math.PI * 2); 
+            ctx.fillStyle = "#000000"; ctx.fill();
+            ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.2; ctx.stroke();
+
+            ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
+            ctx.strokeStyle = "#000000"; ctx.lineWidth = 2.2; ctx.stroke();
+
+            ctx.beginPath(); ctx.arc(0, 0, Math.max(2, r * 0.5), 0, Math.PI * 2); ctx.fillStyle = "#ffffff"; ctx.fill();
+            ctx.strokeStyle = "#000000"; ctx.lineWidth = 0.8; ctx.stroke();
+
+            ctx.fillStyle = isInfinite ? "#ff00ff" : "#000000"; 
+            ctx.font = "900 7.5px 'Courier New', monospace"; 
+            ctx.textAlign = "center";
+            ctx.fillText(formatScore(power), 0, 2.5);
+
+            ctx.restore();
+        }
+
+        function update() {
+            if(!isGameRunning) return;
+            ctx.drawImage(bgCanvas, 0, 0);
+
+            let activePools = Object.keys(pools).filter(k => pools[k].active);
+            let gameOver = (activePools.length <= 1 && Object.keys(pools).length > 1);
+
+            if (!gameOver) {
+                gates.forEach(g => {
+                    ctx.fillStyle = g.cooldown > 0 ? "rgba(100, 0, 0, 0.4)" : "rgba(0, 20, 60, 0.4)";
+                    ctx.fillRect(g.x, g.y, g.w, g.h);
+                    ctx.strokeStyle = "#000000"; ctx.lineWidth = 2.5; ctx.strokeRect(g.x, g.y, g.w, g.h);
+                    ctx.strokeStyle = g.color; ctx.lineWidth = 1; ctx.strokeRect(g.x+1, g.y+1, g.w-2, g.h-2);
+                    ctx.fillStyle = g.color; ctx.font = "bold 9px monospace"; ctx.textAlign = "center";
+                    ctx.fillText(g.label, g.x + g.w/2, g.y + 13);
+                });
+
+                if (gate16x.active) {
+                    ctx.fillStyle = "rgba(40, 0, 40, 0.5)"; ctx.fillRect(gate16x.x, gate16x.y, gate16x.w, gate16x.h);
+                    ctx.strokeStyle = "#000000"; ctx.lineWidth = 3; ctx.strokeRect(gate16x.x, gate16x.y, gate16x.w, gate16x.h);
+                    ctx.strokeStyle = gate16x.color; ctx.lineWidth = 1.5; ctx.strokeRect(gate16x.x+1, gate16x.y+1, gate16x.w-2, gate16x.h-2);
+                    ctx.fillStyle = "#ffffff"; ctx.font = "bold 10px monospace"; ctx.textAlign = "center";
+                    ctx.fillText("x16", gate16x.x + gate16x.w/2, gate16x.y + 16);
+                    ctx.fillText(gate16x.life + "s", gate16x.x + gate16x.w/2, gate16x.y + 30);
+                }
+            }
+
+            Object.keys(pools).forEach(key => {
+                if (hp[key] <= 0) return;
+                let p = pools[key];
+                
+                if (shieldHp[key] > 0) {
+                    ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 2, 0, Math.PI * 2);
+                    ctx.fillStyle = "#000000"; ctx.fill();
+                }
+
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fillStyle = p.color; ctx.fill();
+                ctx.strokeStyle = "#000000"; ctx.lineWidth = 2.0; ctx.stroke();
+                
+                ctx.strokeStyle = "#000"; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(p.x, p.y);
+                ctx.lineTo(p.x + Math.cos(towerAngles[key]) * (p.r + 4), p.y + Math.sin(towerAngles[key]) * (p.r + 4)); ctx.stroke();
+                ctx.fillStyle = "#000"; ctx.font = "bold 6.5px monospace"; ctx.textAlign = "center"; ctx.fillText(p.name, p.x, p.y + 2);
+            });
+
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                let p = projectiles[i];
+
+                if (p.isBig) {
+                    p.radius = getRadiusForPower(p.power);
+                }
+
+                p.x += p.vx; p.y += p.vy;
+                
+                if (p.spawnProtect > 0) p.spawnProtect--; 
+
+                if (p.x <= p.radius) { p.x = p.radius + 1.5; p.vx = Math.abs(p.vx); }
+                if (p.x >= canvas.width - p.radius) { p.x = canvas.width - p.radius - 1.5; p.vx = -Math.abs(p.vx); }
+                if (p.y <= p.radius) { p.y = p.radius + 1.5; p.vy = Math.abs(p.vy); }
+                if (p.y >= canvas.height - p.radius) { p.y = canvas.height - p.radius - 1.5; p.vy = -Math.abs(p.vy); }
+
+                if (p.isBig && p.power >= 10000000 && p.hasShield) { 
+                    for (let j = 0; j < projectiles.length; j++) {
+                        let other = projectiles[j];
+                        if (other && other !== p) {
+                            let dx = p.x - other.x;
+                            let dy = p.y - other.y;
+                            let dist = Math.hypot(dx, dy);
+                            if (dist < 180 && dist > 2) {
+                                other.vx += (dx / dist) * 0.22;
+                                other.vy += (dy / dist) * 0.22;
+                            }
+                        }
+                    }
+                }
+
+                if (!p.isBig) {
+                    for (let j = projectiles.length - 1; j >= 0; j--) {
+                        let targetBall = projectiles[j];
+                        if (targetBall && targetBall.isBig && targetBall.type !== p.type) {
+                            let dist = Math.hypot(p.x - targetBall.x, p.y - targetBall.y);
+                            if (dist < p.radius + targetBall.radius) {
+                                if (targetBall.power >= 1000000000) {
+                                    p.vx *= -1.2;
+                                    p.vy *= -1.2;
+                                    p.type = targetBall.type; 
+                                } else {
+                                    if (!targetBall.isInfinite) targetBall.power = Math.max(0, targetBall.power - p.power); 
+                                    createExplosion(p.x, p.y, p.color);
+                                    projectiles.splice(i, 1);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (!projectiles[i]) continue;
+
+                if (p.isBig) {
+                    for (let j = i - 1; j >= 0; j--) {
+                        let p2 = projectiles[j];
+                        if (p2 && p2.isBig && p.spawnProtect === 0 && p2.spawnProtect === 0) {
+                            let dx = p2.x - p.x;
+                            let dy = p2.y - p.y;
+                            let dist = Math.hypot(dx, dy);
+                            let minDist = p.radius + p2.radius;
+
+                            if (dist < minDist) {
+                                let angle = Math.atan2(dy, dx);
+                                let overlap = minDist - dist;
+                                
+                                p.x -= Math.cos(angle) * (overlap / 2 + 0.1);
+                                p.y -= Math.sin(angle) * (overlap / 2 + 0.1);
+                                p2.x += Math.cos(angle) * (overlap / 2 + 0.1);
+                                p2.y += Math.sin(angle) * (overlap / 2 + 0.1);
+
+                                p.vx = -Math.cos(angle) * Math.hypot(p.vx, p.vy);
+                                p.vy = -Math.sin(angle) * Math.hypot(p.vx, p.vy);
+                                p2.vx = Math.cos(angle) * Math.hypot(p2.vx, p2.vy);
+                                p2.vy = Math.sin(angle) * Math.hypot(p2.vx, p2.vy);
+
+                                if (p.type !== p2.type) {
+                                    if (p.isInfinite && p2.isInfinite) {
+                                        createExplosion(p.x, p.y, "#ff00ff");
+                                        projectiles.splice(i, 1);
+                                        projectiles.splice(j, 1);
+                                        break;
+                                    }
+
+                                    if (p.power >= p2.power) {
+                                        p2.hasShield = false; 
+                                        if (!p.isInfinite) p.power -= p2.power * 0.01; 
+                                    } else {
+                                        p.hasShield = false;
+                                        if (!p2.isInfinite) p2.power -= p.power * 0.01;
+                                    }
+                                    createExplosion((p.x + p2.x)/2, (p.y + p2.y)/2, p.color);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                bgCtx.fillStyle = p.color;
+                let drawSize = p.isBig ? Math.max(3, p.radius * 0.9) : 2.5; 
+                bgCtx.fillRect(p.x - drawSize/2, p.y - drawSize/2, drawSize, drawSize);
+                totalBytesPainted += Math.floor(drawSize * 2);
+                document.getElementById("byteTracker").innerText = `PIKSEL: ${totalBytesPainted.toLocaleString()} BYTE`;
+
+                if (p.isBig && !p.isInfinite) {
+                    p.power = Math.max(0, p.power - 20); 
+                }
+
+                if (!gameOver) {
+                    if (gate16x.active && p.isBig && p.x > gate16x.x && p.x < gate16x.x + gate16x.w && p.y > gate16x.y && p.y < gate16x.y + gate16x.h) {
+                        if (!p.isInfinite) p.power = Math.min(1000000000, p.power * 16); 
+                        createExplosion(p.x, p.y, gate16x.color);
+                        p.x += p.vx * 2; p.y += p.vy * 2;
+                    }
+
+                    if (p.isBig) {
+                        gates.forEach(g => {
+                            if (g.cooldown === 0 && p.x > g.x && p.x < g.x + g.w && p.y > g.y && p.y < g.y + g.h) {
+                                g.cooldown = 10;
+                                if (!p.isInfinite) p.power = Math.min(1000000000, p.power * g.mult);
+                                createExplosion(p.x, p.y, g.color);
+                            }
+                        });
+                    }
+                }
+
+                if (!projectiles[i]) continue;
+
+                Object.keys(pools).forEach(key => {
+                    if (hp[key] > 0 && pools[key].active) {
+                        let pool = pools[key];
+                        let dist = Math.hypot(p.x - pool.x, p.y - pool.y);
+                        if (dist < pool.r + p.radius) {
+                            if (key === p.type) {
+                                if (p.spawnProtect === 0) {
+                                    let angle = Math.atan2(p.y - pool.y, p.x - pool.x);
+                                    p.vx = Math.cos(angle) * Math.hypot(p.vx, p.vy);
+                                    p.vy = Math.sin(angle) * Math.hypot(p.vx, p.vy);
+                                    p.x = pool.x + Math.cos(angle) * (pool.r + p.radius + 1.5);
+                                    p.y = pool.y + Math.sin(angle) * (pool.r + p.radius + 1.5);
+                                }
+                            } else {
+                                if (shieldHp[key] > 0) {
+                                    shieldHp[key] -= p.power;
+                                    createExplosion(p.x, p.y, "#000000");
+                                    if (shieldHp[key] < 0) {
+                                        hp[key] += shieldHp[key]; 
+                                        shieldHp[key] = 0;
+                                    }
+                                } else {
+                                    hp[key] -= p.power; 
+                                    createExplosion(p.x, p.y, p.color);
+                                }
+
+                                if (hp[key] <= 0) { 
+                                    hp[key] = 0; 
+                                    pools[key].active = false; 
+                                    triggerEliminationLoot(key); 
+                                }
+                                projectiles.splice(i, 1);
+                            }
+                        }
+                    }
+                });
+
+                if (projectiles[i] && projectiles[i].power <= 0) {
+                    createExplosion(projectiles[i].x, projectiles[i].y, projectiles[i].color);
+                    projectiles.splice(i, 1);
+                } else if (!projectiles[i]) continue;
+
+                if (p.isBig) {
+                    drawShieldedMarble(ctx, p.x, p.y, p.radius, p.color, p.power, p.hasShield, p.vx, p.vy, p.isInfinite);
+                } else {
+                    ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fillStyle = p.color; ctx.fill();
+                }
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life--;
+                ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size);
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+
+            Object.keys(pools).forEach(id => {
+                let txtElem = document.getElementById(`txt-${id}`);
+                if (txtElem) {
+                    if (hp[id] > 0) { txtElem.innerText = `C:${formatScore(hp[id])}|M:${ammo[id]}`; } 
+                    else { txtElem.innerText = `ELENDİ!`; }
+                }
+            });
+
+            if (gameOver) {
+                ctx.fillStyle = pools[activePools[0]].color; ctx.font = "bold 16px monospace"; ctx.textAlign = "center";
+                ctx.fillText("🏆 KAZANAN: " + pools[activePools[0]].name, canvas.width/2, canvas.height/2 - 10);
+                ctx.fillStyle = "#ffffff"; ctx.font = "10px monospace";
+                ctx.fillText("3 saniye sonra sıfırlanıyor...", canvas.width/2, canvas.height/2 + 10);
+
+                if (!gameOverTimer) {
+                    gameOverTimer = setTimeout(() => {
+                        resetToMainMenu();
+                    }, 3000); 
+                }
+            }
+            requestAnimationFrame(update);
+        }
+    </script>
+</body>
+</html>
