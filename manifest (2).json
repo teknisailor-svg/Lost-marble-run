@@ -1,0 +1,13 @@
+{
+  "background_color": "#ffffff",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "Lost Marble Run",
+  "orientation": "any",
+  "scope": "/",
+  "short_name": "Marble Run",
+  "start_url": "/",
+  "theme_color": "#ffffff",
+  "id": "com.lost.marblerun",
+  "description": "Lost Marble Run oyunu"
+}
